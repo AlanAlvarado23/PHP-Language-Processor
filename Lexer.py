@@ -41,8 +41,8 @@ class Lexer:
             '%': Token.Type.Modulo,
             '++': Token.Type.Incremento,      # <-- ¡Añadido!
             '--': Token.Type.Decremento,      # <-- ¡Añadido!
-            '==': Token.Type.IgualQue,
-            '!=': Token.Type.DiferenteQue,
+            '==': Token.Type.Igualdad,
+            '!=': Token.Type.Desigualdad,
             '<=': Token.Type.MenorIgual,
             '>=': Token.Type.MayorIgual,
             '<': Token.Type.MenorQue,

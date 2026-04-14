@@ -12,12 +12,12 @@ class Token:
         Multiplica = "Multiplica"    # *
         Divide = "Divide"            # /
         Modulo = "Modulo"            # %
-        Incremento = "Incremento"    # ++  <-- ¡Añadido para ciclos for!
-        Decremento = "Decremento"    # --  <-- ¡Añadido para ciclos for!
+        Incremento = "Incremento"    # ++  
+        Decremento = "Decremento"    # --  
         
         # --- Operadores Relacionales ---
-        IgualQue = "IgualQue"        # ==
-        DiferenteQue = "Diferente"   # !=
+        Igualdad = "Igualdad"        # ==
+        Desigualdad = "Diferente"   # !=
         MayorQue = "MayorQue"        # >
         MenorQue = "MenorQue"        # <
         MayorIgual = "MayorIgual"    # >=
@@ -52,12 +52,12 @@ class Token:
         Break = "Break"              # break
         While = "While"              # while
         For = "For"                  # for
-        Array = "Array"              # array  <-- ¡Añadido para declarar arreglos!
+        Array = "Array"              # array  
         
         # --- Funciones Integradas / I/O ---
         Echo = "Echo"                # echo
         Read = "Read"                # read
-        Count = "Count"              # count  <-- ¡Añadido para obtener longitud del arreglo!
+        Count = "Count"              # count  
         
         # --- Etiquetas PHP ---
         PhpOpen = "PhpOpen"          # <?php
@@ -66,6 +66,13 @@ class Token:
         # --- Especiales ---
         Fin = "EOF"                  # Fin de archivo
         Invalido = "Invalido"        # Cualquier caracter no reconocido
+
+        # --- Código Intermedio y Máquina Virtual (NUEVOS) ---
+        Temp = "Temp"                # Variables temporales del compilador (t1, t2...)
+        Label = "Label"              # Etiquetas de salto para ciclos y condicionales (L1, L2...)
+        Goto = "Goto"                # Salto incondicional
+        GotoIfFalse = "GotoIfFalse"  # Salto condicional si la evaluación es falsa
+        GotoIfTrue = "GotoIfTrue"    # Salto condicional si la evaluación es verdadera
 
     def __init__(self, type, value, line=0):
         self.type = type

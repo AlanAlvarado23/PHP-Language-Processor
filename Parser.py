@@ -10,7 +10,12 @@ class TreeNode:
         self.center = None  # Hijo central (Usado para el Else/ElseIf en el If)
         self.step = None    # Hijo de paso (Usado EXCLUSIVAMENTE para el incremento del FOR)
         self.next = None    # Siguiente instrucción (Hermano)
-    
+        
+        # --- Metadatos para Código Intermedio y Máquina Virtual ---
+        self.line = getattr(token, 'line', 0)  # Conserva la línea exacta para reportes de error en la VM
+        self.eval_type = None                  # Será llenado por Semantic.py (ej. INT, FLOAT, ARRAY)
+        self.mem_id = None
+
     def __repr__(self):
         return f"TreeNode({self.token.type}, {self.token.value})"
 
@@ -353,7 +358,7 @@ class Parser:
 
     def condicion(self):
         nodo_izq = self.expr()
-        ops_relacionales = [Token.Type.IgualQue, Token.Type.DiferenteQue, Token.Type.MenorQue, 
+        ops_relacionales = [Token.Type.Igualdad, Token.Type.Desigualdad, Token.Type.MenorQue, 
                             Token.Type.MayorQue, Token.Type.MenorIgual, Token.Type.MayorIgual]
                             
         if self.token_actual.type in ops_relacionales:
@@ -445,17 +450,26 @@ class Parser:
 
     def errores(self, codigo):
         linea = self.lexer.lineaActual() if hasattr(self.lexer, 'lineaActual') else "Desconocida"
-        self.console.print(f"LINEA {linea} ERROR SINTACTICO {codigo}")
         error_messages = {
-            1: " :ESPERABA UN ;", 2: " :ESPERABA UN ?> AL FINAL", 3: " :ESPERABA UN =",
-            4: " :ESPERABA UN )", 5: " :ESPERABA UNA VARIABLE PHP (EJEMPLO: $var)",
-            6: " :INSTRUCCION DESCONOCIDA O SINTAXIS INVALIDA", 7: " :ESPERABA UNA CONSTANTE",
-            8: " :ESPERABA LA ETIQUETA <?php", 9: " :ESPERABA UNA {", 10: " :ESPERABA UN (",
-            11: " :ESPERABA UNA }", 12: " :ESPERABA UN OPERADOR RELACIONAL (==, !=, <, >, <=, >=)",
+            1: " :ESPERABA UN ;",
+            2: " :ESPERABA UN ?> AL FINAL",
+            3: " :ESPERABA UN =",
+            4: " :ESPERABA UN )",
+            5: " :ESPERABA UNA VARIABLE PHP (EJEMPLO: $var)",
+            6: " :INSTRUCCION DESCONOCIDA O SINTAXIS INVALIDA",
+            7: " :ESPERABA UNA CONSTANTE",
+            8: " :ESPERABA LA ETIQUETA <?php",
+            9: " :ESPERABA UNA {",
+            10: " :ESPERABA UN (",
+            11: " :ESPERABA UNA }",
+            12: " :ESPERABA UN OPERADOR RELACIONAL (==, !=, <, >, <=, >=)",
             13: " :ESPERABA UN : (DOS PUNTOS)",
             14: " :ESPERABA 'case' O 'default'",
             15: " :BREAK FUERA DE UN CICLO O SWITCH",
             16: " :ESPERABA UN ]"
         }
-        self.console.print(error_messages.get(codigo, " :NO DOCUMENTADO"))
-        sys.exit(-(codigo + 100))
+        mensaje = error_messages.get(codigo, " :NO DOCUMENTADO")
+        self.console.print(f"LINEA {linea} ERROR SINTACTICO {codigo}{mensaje}")
+        
+        # EL CAMBIO: Lanzar un error en lugar de matar la app
+        raise Exception(f"Análisis Sintáctico abortado: Error {codigo}")
