@@ -117,5 +117,3 @@ Contributions are welcome! If you'd like to improve the Virtual Machine, add sem
 ## License
 
 This project is distributed under the MIT License. See `LICENSE` for more information.
-
-```
