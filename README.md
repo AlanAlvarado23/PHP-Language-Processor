@@ -1,4 +1,3 @@
-```markdown
 # PHP Compiler & Virtual Machine
 
 ![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)
@@ -118,7 +117,5 @@ Contributions are welcome! If you'd like to improve the Virtual Machine, add sem
 ## License
 
 This project is distributed under the MIT License. See `LICENSE` for more information.
-
-```
 
 ```
