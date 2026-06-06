@@ -1,134 +1,199 @@
 import Env
 from Token import Token
-from Middle_Code import GeneraCodigo
+from Middle_Code import Middle_Code_Generator
 
 class Code_Generator:
-    def __init__(self, arbol, archivo_salida="output.asm", console=None):
-        self.arbol = arbol
+    """
+    Translates the Abstract Syntax Tree (AST) into intermediate code (assembly/bytecode)
+    for execution in the Virtual_Machine.
+    """
+
+    def __init__(self, tree, output_file="output.asm", console=None):
+        """
+        Initializes the Code_Generator.
+
+        Args:
+            tree (Node): The root node of the Abstract Syntax Tree.
+            output_file (str, optional): The path for the generated assembly output. Defaults to "output.asm".
+            console (Console, optional): The console environment for system logging. Defaults to Env.console.
+        """
+        self.tree = tree
         self.console = console or Env.console
-        # Instanciamos la herramienta de escritura (Middle_Code)
-        self.generador_instrucciones = GeneraCodigo(archivo_salida, self.console)
+        # Instantiate the intermediate code writing utility
+        self.instruction_generator = Middle_Code_Generator(output_file, self.console)
 
-    def generar_codigo(self):
-        """Inicia el proceso de traducción del AST a código de máquina virtual."""
+    def generate_code(self):
+        """
+        Starts the AST translation process to generate the virtual machine bytecode.
+        
+        This method triggers the traversal of the syntax tree and gracefully
+        closes the file stream once the intermediate code generation is complete.
+        """
         if self.console:
-            self.console.print_notification("\n[SNAKE_CASE] INICIO DE GENERACIÓN DE CÓDIGO INTERMEDIO")
+            self.console.print_notification("\n[INFO] STARTING INTERMEDIATE CODE GENERATION")
             
-        self.visitar_nodo(self.arbol)
+        self.visit_node(self.tree)
         
-        # Finalizar programa
-        self.generador_instrucciones.end() 
+        # Finalize the program execution instructions
+        self.instruction_generator.end() 
         
         if self.console:
-            self.console.print_notification(f"ARCHIVO GENERADO: {self.generador_instrucciones.archivo_salida}")
+            self.console.print_notification(f"[SUCCESS] FILE GENERATED: {self.instruction_generator.output_file}")
 
-    def visitar_nodo(self, nodo):
-        """Recorrido recursivo del árbol para generar instrucciones de pila."""
-        if nodo is None:
+    def visit_node(self, node):
+        """
+        Recursively traverses the AST to generate stack-based virtual machine instructions.
+
+        Args:
+            node (Node): The current AST node being evaluated. Returns immediately if None.
+        """
+        if node is None:
             return
 
-        t = nodo.token.type
-        linea = getattr(nodo.token, 'line', getattr(nodo, 'line', None))
+        token_type = node.token.type
+        line = getattr(node.token, 'line', getattr(node, 'line', None))
 
-        # --- 1. BLOQUE DE ENTRADA PHP ---
-        if t == Token.Type.PhpOpen:
-            self.visitar_nodo(nodo.left)
+        # --- 1. PHP OPEN TAG ---
+        if token_type == Token.Type.PhpOpen:
+            self.visit_node(node.left)
 
-        # --- 2. ASIGNACIONES ($x = 10) ---
-        elif t == Token.Type.Asignacion:
-            nodo_var = nodo.left
-            # Dirección de memoria de la variable
-            self.generador_instrucciones.pusha(nodo_var.mem_id, linea)
+        # --- 2. ASSIGNMENTS ($x = 10, $a = array(), $a[$i] = 5) ---
+        elif token_type == Token.Type.Assignment:
+            var_node = node.left
             
-            # Si es un arreglo ($a[$i]), calculamos la posición real
-            if nodo_var.left:
-                self.visitar_nodo(nodo_var.left)
-                self.generador_instrucciones.add(linea)
-
-            # Valor a asignar
-            self.visitar_nodo(nodo.right)
-            self.generador_instrucciones.store(linea)
-
-        # --- 3. VALORES LITERALES ---
-        elif t in [Token.Type.Numero, Token.Type.Cadena, Token.Type.Booleano]:
-            self.generador_instrucciones.pushc(nodo.token.value, linea)
-            
-        # --- 4. USO DE VARIABLES ---
-        elif t == Token.Type.Variable:
-            self.generador_instrucciones.pusha(nodo.mem_id, linea)
-            if nodo.left:
-                self.visitar_nodo(nodo.left)
-                self.generador_instrucciones.add(linea)
-            self.generador_instrucciones.load(linea)
-
-        # --- 5. ARITMÉTICA ---
-        elif t in [Token.Type.Suma, Token.Type.Resta, Token.Type.Multiplica, Token.Type.Divide, Token.Type.Modulo]:
-            self.visitar_nodo(nodo.left)
-            self.visitar_nodo(nodo.right)
-            
-            if t == Token.Type.Suma: self.generador_instrucciones.add(linea)
-            elif t == Token.Type.Resta: self.generador_instrucciones._escribir("SUB", linea)
-            elif t == Token.Type.Multiplica: self.generador_instrucciones.mul(linea)
-            elif t == Token.Type.Divide: self.generador_instrucciones.div(linea)
-            elif t == Token.Type.Modulo: self.generador_instrucciones.mod(linea)
-
-        # --- 6. COMPARACIONES ---
-        elif t in [Token.Type.Igualdad, Token.Type.Desigualdad, Token.Type.MenorQue, 
-                   Token.Type.MayorQue, Token.Type.MenorIgual, Token.Type.MayorIgual]:
-            self.visitar_nodo(nodo.left)
-            self.visitar_nodo(nodo.right)
-            self.generador_instrucciones.op_relacional(nodo.token.value, linea)
-
-        # --- 7. CONTROL DE FLUJO: IF ---
-        elif t == Token.Type.If:
-            self.visitar_nodo(nodo.left) # Condición
-            
-            etiq_falso = self.generador_instrucciones.nueva_etiqueta()
-            etiq_fin = self.generador_instrucciones.nueva_etiqueta()
-            
-            self.generador_instrucciones.goto_if_false(etiq_falso, linea)
-            self.visitar_nodo(nodo.right) # Bloque verdadero
-            self.generador_instrucciones.goto(etiq_fin, linea)
-            
-            self.generador_instrucciones.label(etiq_falso, linea)
-            if nodo.center: self.visitar_nodo(nodo.center) # Else
-            self.generador_instrucciones.label(etiq_fin, linea)
-
-        # --- 8. CONTROL DE FLUJO: WHILE ---
-        elif t == Token.Type.While:
-            etiq_inicio = self.generador_instrucciones.nueva_etiqueta()
-            etiq_fin = self.generador_instrucciones.nueva_etiqueta()
-            
-            self.generador_instrucciones.label(etiq_inicio, linea)
-            self.visitar_nodo(nodo.left) # Condición
-            self.generador_instrucciones.goto_if_false(etiq_fin, linea)
-            
-            self.visitar_nodo(nodo.right) # Cuerpo
-            self.generador_instrucciones.goto(etiq_inicio, linea)
-            self.generador_instrucciones.label(etiq_fin, linea)
-
-        # --- 9. OPERACIONES UNARIAS ($i++) ---
-        elif t in [Token.Type.Incremento, Token.Type.Decremento]:
-            nodo_var = nodo.left
-            self.generador_instrucciones.pusha(nodo_var.mem_id, linea)
-            if nodo_var.left:
-                self.visitar_nodo(nodo_var.left)
-                self.generador_instrucciones.add(linea)
+            # CASE A: Creation of a new array structure ($data = array(...))
+            if node.right.token.type == Token.Type.Array:
+                # Step 1: Count array elements to allocate correct memory block
+                element = node.right.left
+                size = 0
+                while element:
+                    size += 1
+                    element = element.next
                 
-            self.generador_instrucciones._escribir("CLON", linea) 
-            self.generador_instrucciones.load(linea)
-            self.generador_instrucciones.pushc("1", linea)
-            
-            if t == Token.Type.Incremento:
-                self.generador_instrucciones.add(linea)
+                # Step 2: Allocate memory in the VM
+                self.instruction_generator.alloc_array(var_node.mem_id, size, line)
+                
+                # Step 3: Iteratively store each element at its respective index
+                element = node.right.left
+                index = 0
+                while element:
+                    self.visit_node(element)  # PUSH the value
+                    self.instruction_generator.pushc(str(index), line)  # PUSH the index
+                    self.instruction_generator.store_index(var_node.mem_id, line)
+                    index += 1
+                    element = element.next
+
+            # CASE B: Assignment to a specific existing array index ($data[$j] = ...)
+            elif getattr(var_node, 'left', None):
+                self.visit_node(node.right)  # PUSH the target value
+                self.visit_node(var_node.left)  # PUSH the target index
+                self.instruction_generator.store_index(var_node.mem_id, line)
+
+            # CASE C: Standard scalar variable assignment ($n = 5)
             else:
-                self.generador_instrucciones._escribir("SUB", linea)
-            self.generador_instrucciones.store(linea)
+                self.instruction_generator.pusha(var_node.mem_id, line)
+                self.visit_node(node.right)
+                self.instruction_generator.store(line)
 
-        # --- 10. SALIDA (ECHO) ---
-        elif t == Token.Type.Echo:
-            self.visitar_nodo(nodo.left)
-            self.generador_instrucciones.output(linea)
+        # --- 3. LITERAL VALUES ---
+        elif token_type in [Token.Type.Number, Token.Type.String, Token.Type.Boolean]:
+            self.instruction_generator.pushc(node.token.value, line)
+            
+        # --- 4. VARIABLE USAGE ---
+        elif token_type == Token.Type.Variable:
+            # If a left child exists, it represents an array index retrieval access ($data[$i])
+            if getattr(node, 'left', None):
+                self.visit_node(node.left)  # PUSH the index
+                self.instruction_generator.load_index(node.mem_id, line)
+            
+            # Standard variable access
+            else:
+                self.instruction_generator.pusha(node.mem_id, line)
+                self.instruction_generator.load(line)
 
-        # Continuar con el siguiente nodo hermano
-        self.visitar_nodo(nodo.next)
+        # --- 5. ARITHMETIC OPERATIONS ---
+        elif token_type in [Token.Type.Addition, Token.Type.Subtraction, Token.Type.Multiplication, Token.Type.Division, Token.Type.Modulo]:
+            self.visit_node(node.left)
+            self.visit_node(node.right)
+            
+            if token_type == Token.Type.Addition: 
+                self.instruction_generator.add(line)
+            elif token_type == Token.Type.Subtraction: 
+                self.instruction_generator._write("SUB", line)
+            elif token_type == Token.Type.Multiplication: 
+                self.instruction_generator.mul(line)
+            elif token_type == Token.Type.Division: 
+                self.instruction_generator.div(line)
+            elif token_type == Token.Type.Modulo: 
+                self.instruction_generator.mod(line)
+
+        # --- 6. RELATIONAL COMPARISONS ---
+        elif token_type in [Token.Type.Equality, Token.Type.Inequality, Token.Type.LessThan, 
+                            Token.Type.GreaterThan, Token.Type.LessOrEqual, Token.Type.GreaterOrEqual]:
+            self.visit_node(node.left)
+            self.visit_node(node.right)
+            self.instruction_generator.relational_op(node.token.value, line)
+
+        # --- 7. CONTROL FLOW: IF STATEMENT ---
+        elif token_type == Token.Type.If:
+            self.visit_node(node.left)  # Evaluate boolean condition
+            
+            label_false = self.instruction_generator.new_label()
+            label_end = self.instruction_generator.new_label()
+            
+            self.instruction_generator.goto_if_false(label_false, line)
+            self.visit_node(node.right)  # Execution block if condition is TRUE
+            self.instruction_generator.goto(label_end, line)
+            
+            self.instruction_generator.label(label_false, line)
+            if node.center: 
+                self.visit_node(node.center)  # Execution block for ELSE (if exists)
+            self.instruction_generator.label(label_end, line)
+
+        # --- 8. CONTROL FLOW: WHILE LOOP ---
+        elif token_type == Token.Type.While:
+            label_start = self.instruction_generator.new_label()
+            label_end = self.instruction_generator.new_label()
+            
+            self.instruction_generator.label(label_start, line)
+            self.visit_node(node.left)  # Evaluate loop condition
+            self.instruction_generator.goto_if_false(label_end, line)
+            
+            self.visit_node(node.right)  # Loop body execution
+            self.instruction_generator.goto(label_start, line)
+            self.instruction_generator.label(label_end, line)
+
+        # --- 9. UNARY OPERATIONS ($i++) ---
+        elif token_type in [Token.Type.Increment, Token.Type.Decrement]:
+            var_node = node.left
+            self.instruction_generator.pusha(var_node.mem_id, line)
+            
+            # Resolve index if operating on an array element
+            if getattr(var_node, 'left', None):
+                self.visit_node(var_node.left)
+                self.instruction_generator.add(line)
+                
+            self.instruction_generator._write("CLON", line) 
+            self.instruction_generator.load(line)
+            self.instruction_generator.pushc("1", line)
+            
+            if token_type == Token.Type.Increment:
+                self.instruction_generator.add(line)
+            else:
+                self.instruction_generator._write("SUB", line)
+            
+            self.instruction_generator.store(line)
+
+        # --- 10. SYSTEM I/O (ECHO) ---
+        elif token_type == Token.Type.Echo:
+            self.visit_node(node.left)
+            self.instruction_generator.output(line)
+
+        # --- 11. NATIVE SYSTEM FUNCTIONS (COUNT) ---
+        elif token_type == Token.Type.Count:
+            if node.left:
+                array_mem_id = node.left.mem_id
+                self.instruction_generator.count_array(array_mem_id, line)
+
+        # Proceed to evaluate the next sibling node in the AST sequence
+        self.visit_node(node.next)

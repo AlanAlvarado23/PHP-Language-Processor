@@ -1,48 +1,52 @@
 class Token:
+    """
+    Represents a lexical token extracted from the source code.
+    Contains the token type, its literal value, and the line number for error tracking.
+    """
     class Type:
-        # --- Tipos de Datos y Variables ---
-        Numero = "Numero"            # 123, 4.56
-        Variable = "Variable"        # $var, $indice
-        Cadena = "Cadena"            # "Hola Mundo", 'Texto'
-        Booleano = "Booleano"        # true, false
+        # --- Data Types and Variables ---
+        Number = "Number"            # 123, 4.56
+        Variable = "Variable"        # $var, $index
+        String = "String"            # "Hello World", 'Text'
+        Boolean = "Boolean"          # true, false
         
-        # --- Operadores Aritméticos ---
-        Suma = "Suma"                # +
-        Resta = "Resta"              # -
-        Multiplica = "Multiplica"    # *
-        Divide = "Divide"            # /
+        # --- Arithmetic Operators ---
+        Addition = "Addition"        # +
+        Subtraction = "Subtraction"  # -
+        Multiplication = "Multiplication" # *
+        Division = "Division"        # /
         Modulo = "Modulo"            # %
-        Incremento = "Incremento"    # ++  
-        Decremento = "Decremento"    # --  
+        Increment = "Increment"      # ++  
+        Decrement = "Decrement"      # --  
         
-        # --- Operadores Relacionales ---
-        Igualdad = "Igualdad"        # ==
-        Desigualdad = "Diferente"   # !=
-        MayorQue = "MayorQue"        # >
-        MenorQue = "MenorQue"        # <
-        MayorIgual = "MayorIgual"    # >=
-        MenorIgual = "MenorIgual"    # <=
+        # --- Relational Operators ---
+        Equality = "Equality"        # ==
+        Inequality = "Inequality"    # !=
+        GreaterThan = "GreaterThan"  # >
+        LessThan = "LessThan"        # <
+        GreaterOrEqual = "GreaterOrEqual" # >=
+        LessOrEqual = "LessOrEqual"  # <=
         
-        # --- Operadores de Asignación ---
-        Asignacion = "Asignacion"    # =
+        # --- Assignment Operators ---
+        Assignment = "Assignment"    # =
         
-        # --- Operadores Lógicos ---
+        # --- Logical Operators ---
         And = "And"                  # &&
         Or = "Or"                    # ||
         Not = "Not"                  # !
 
-        # --- Símbolos de Agrupación y Delimitadores ---
-        ParIzq = "ParIzq"            # (
-        ParDer = "ParDer"            # )
-        LlaveIzq = "LlaveIzq"        # {
-        LlaveDer = "LlaveDer"        # }
-        CorcheteIzq = "CorcheteIzq"  # [
-        CorcheteDer = "CorcheteDer"  # ]
-        PuntoComa = "PuntoComa"      # ;
-        DosPuntos = "DosPuntos"      # :
-        Coma = "Coma"                # ,
+        # --- Grouping Symbols and Delimiters ---
+        LeftParen = "LeftParen"      # (
+        RightParen = "RightParen"    # )
+        LeftBrace = "LeftBrace"      # {
+        RightBrace = "RightBrace"    # }
+        LeftBracket = "LeftBracket"  # [
+        RightBracket = "RightBracket"# ]
+        Semicolon = "Semicolon"      # ;
+        Colon = "Colon"              # :
+        Comma = "Comma"              # ,
 
-        # --- Palabras Reservadas (Estructuras de Control y Tipos) ---
+        # --- Reserved Words (Control Structures and Types) ---
         If = "If"                    # if
         ElseIf = "ElseIf"            # elseif
         Else = "Else"                # else
@@ -54,30 +58,31 @@ class Token:
         For = "For"                  # for
         Array = "Array"              # array  
         
-        # --- Funciones Integradas / I/O ---
+        # --- Built-in Functions / I/O ---
         Echo = "Echo"                # echo
         Read = "Read"                # read
         Count = "Count"              # count  
         
-        # --- Etiquetas PHP ---
+        # --- PHP Tags ---
         PhpOpen = "PhpOpen"          # <?php
         PhpClose = "PhpClose"        # ?>
 
-        # --- Especiales ---
-        Fin = "EOF"                  # Fin de archivo
-        Invalido = "Invalido"        # Cualquier caracter no reconocido
+        # --- Special ---
+        End = "EOF"                  # End of File
+        Invalid = "Invalid"          # Unrecognized character
 
-        # --- Código Intermedio y Máquina Virtual (NUEVOS) ---
-        Temp = "Temp"                # Variables temporales del compilador (t1, t2...)
-        Label = "Label"              # Etiquetas de salto para ciclos y condicionales (L1, L2...)
-        Goto = "Goto"                # Salto incondicional
-        GotoIfFalse = "GotoIfFalse"  # Salto condicional si la evaluación es falsa
-        GotoIfTrue = "GotoIfTrue"    # Salto condicional si la evaluación es verdadera
+        # --- Intermediate Code and Virtual Machine (NEW) ---
+        Temp = "Temp"                # Compiler temporary variables (t1, t2...)
+        Label = "Label"              # Jump labels for loops and conditionals (L1, L2...)
+        Goto = "Goto"                # Unconditional jump
+        GotoIfFalse = "GotoIfFalse"  # Conditional jump if evaluation is false
+        GotoIfTrue = "GotoIfTrue"    # Conditional jump if evaluation is true
 
-    def __init__(self, type, value, line=0):
-        self.type = type
+    def __init__(self, token_type, value, line=0):
+        # We rename 'type' to 'token_type' to avoid shadowing the built-in python type() function
+        self.type = token_type
         self.value = value
         self.line = line
 
     def __str__(self):
-        return f"Token({self.type}, '{self.value}', linea {self.line})"
+        return f"Token({self.type}, '{self.value}', line {self.line})"

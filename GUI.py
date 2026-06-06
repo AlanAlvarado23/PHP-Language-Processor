@@ -10,19 +10,25 @@ import Env
 
 from Lexer import Lexer
 from Parser import Parser
-from Semantic import SemanticAnalyzer
+from Semantic import Semantic_Analyzer
 from Code_Generator import Code_Generator
 from Virtual_Machine import Virtual_Machine
 
 
 class GUI:
+    """
+    Main Graphical User Interface for the PHP Compiler IDE.
+    Manages the code editor tabs, file explorer, output console, 
+    and the execution pipeline (Parsing, Semantic Analysis, Code Generation, and VM).
+    """
+
     def __init__(self):
         self.window_size = "1100x700"
         self.title = "PHP Compiler"
 
         self.current_directory = os.getcwd()
 
-        # Paleta de colores estilo IntelliJ (Darcula)
+        # IntelliJ (Darcula) style color palette
         self.bg_editor = "#2b2b2b"
         self.bg_panel = "#3c3f41"
         self.bg_tab_active = "#4e5254"
@@ -35,6 +41,7 @@ class GUI:
         
         self.setup_styles()
         
+        # Main layout structure (PanedWindows)
         self.main_pw = PanedWindow(self.root, orient="horizontal", sashwidth=2, bg="#2d2f30", bd=0, sashrelief=FLAT)
         self.main_pw.pack(fill="both", expand=True)
 
@@ -59,6 +66,11 @@ class GUI:
 
         self.tabs = {} 
 
+        # Compiler State Variables
+        self.ast = None
+        self.is_semantic_approved = False
+        self.output_asm_path = None
+
         self.setup_menus()
         self.setup_statusbar()
         self.setup_console()
@@ -67,6 +79,7 @@ class GUI:
         self.bind_events()
 
     def setup_styles(self):
+        """Configures the ttk themes and styles to match the Darcula palette."""
         style = ttk.Style()
         if 'clam' in style.theme_names():
             style.theme_use('clam')
@@ -83,35 +96,38 @@ class GUI:
         style.layout('TNotebook.Tab', []) 
 
     def setup_menus(self):
+        """Builds the application's top menu bar."""
         self.menu_bar = Menu(self.root, bg=self.bg_panel, fg=self.fg_ui, relief=FLAT, bd=0)
 
         self.menu_file = Menu(self.menu_bar, tearoff=0, bg=self.bg_panel, fg=self.fg_ui, activebackground="#2f65ca", bd=0)
-        self.menu_file.add_command(label="Nuevo Archivo", command=self.new_file, accelerator="Ctrl+N")
-        self.menu_file.add_command(label="Abrir Archivo", command=self.open_file, accelerator="Ctrl+O")
-        self.menu_file.add_command(label="Abrir Carpeta", command=self.open_folder)
-        self.menu_file.add_command(label="Guardar", command=self.save_file, accelerator="Ctrl+S")
-        self.menu_file.add_command(label="Guardar Como", command=self.save_file_as, accelerator="Ctrl+Shift+S")
+        self.menu_file.add_command(label="New File", command=self.new_file, accelerator="Ctrl+N")
+        self.menu_file.add_command(label="Open File", command=self.open_file, accelerator="Ctrl+O")
+        self.menu_file.add_command(label="Open Folder", command=self.open_folder)
+        self.menu_file.add_command(label="Save", command=self.save_file, accelerator="Ctrl+S")
+        self.menu_file.add_command(label="Save As", command=self.save_file_as, accelerator="Ctrl+Shift+S")
         self.menu_file.add_separator()
-        self.menu_file.add_command(label="Salir", command=self.on_closing)
-        self.menu_bar.add_cascade(label="Archivo", menu=self.menu_file)
+        self.menu_file.add_command(label="Exit", command=self.on_closing)
+        self.menu_bar.add_cascade(label="File", menu=self.menu_file)
 
         self.menu_edit = Menu(self.menu_bar, tearoff=0, bg=self.bg_panel, fg=self.fg_ui, activebackground="#2f65ca", bd=0)
-        self.menu_edit.add_command(label="Copiar")
-        self.menu_edit.add_command(label="Pegar")
-        self.menu_edit.add_command(label="Cortar")
-        self.menu_bar.add_cascade(label="Editar", menu=self.menu_edit)
+        self.menu_edit.add_command(label="Copy")
+        self.menu_edit.add_command(label="Paste")
+        self.menu_edit.add_command(label="Cut")
+        self.menu_edit.add_command(label="Clear Console", command=lambda: Env.console.clear())
+        self.menu_bar.add_cascade(label="Edit", menu=self.menu_edit)
 
         self.menu_run = Menu(self.menu_bar, tearoff=0, bg=self.bg_panel, fg=self.fg_ui, activebackground="#2f65ca", bd=0)
-        self.menu_run.add_command(label="1. Análisis Sintáctico (Parser)", command=self.parse, accelerator="Ctrl+P")
-        self.menu_run.add_command(label="2. Análisis Semántico", command=self.semantic, accelerator="Ctrl+L")
+        self.menu_run.add_command(label="1. Syntax Analysis (Parser)", command=self.parse, accelerator="Ctrl+P")
+        self.menu_run.add_command(label="2. Semantic Analysis", command=self.semantic, accelerator="Ctrl+L")
         self.menu_run.add_separator()
-        self.menu_run.add_command(label="3. Generar Código (VM Stack)", command=self.generate_code, accelerator="Ctrl+G")
-        self.menu_run.add_command(label="4. Ejecutar en Máquina Virtual", command=self.run_vm, accelerator="Ctrl+R")
-        self.menu_bar.add_cascade(label="Ejecutar", menu=self.menu_run)
+        self.menu_run.add_command(label="3. Generate Code (VM Stack)", command=self.generate_code, accelerator="Ctrl+G")
+        self.menu_run.add_command(label="4. Run in Virtual Machine", command=self.run_vm, accelerator="Ctrl+R")
+        self.menu_bar.add_cascade(label="Run", menu=self.menu_run)
         self.menu_run.add_separator()
-        self.menu_run.add_command(label="Ejecutar Todo", command=self.run_all, accelerator="Ctrl+M")
+        self.menu_run.add_command(label="Run All", command=self.run_all, accelerator="Ctrl+M")
 
     def setup_editor(self):
+        """Initializes the notebook and tab bar for the code editor."""
         self.tab_bar = Frame(self.top_frame, bg=self.bg_panel, bd=0)
         self.tab_bar.pack(side=TOP, fill=X)
 
@@ -121,11 +137,13 @@ class GUI:
         self.add_tab(None, "") 
 
     def setup_console(self):
-        self.label_salida = Label(self.bottom_frame, text='Consola de Salida', bg=self.bg_panel, fg='#8a9094', font=('Segoe UI', 9, 'bold'), bd=0, highlightthickness=0)
+        """Initializes the output console component."""
+        self.output_label = Label(self.bottom_frame, text='Output Console', bg=self.bg_panel, fg='#8a9094', font=('Segoe UI', 9, 'bold'), bd=0, highlightthickness=0)
         self.console.create(((0, 1), (1, 1)))
 
     def setup_explorer(self):
-        self.tree_label = Label(self.right_frame, text="PROYECTO", bg=self.bg_panel, fg='#8a9094', font=('Segoe UI', 9, 'bold'), anchor='w', bd=0, highlightthickness=0)
+        """Initializes the project file explorer tree and path entry."""
+        self.tree_label = Label(self.right_frame, text="PROJECT", bg=self.bg_panel, fg='#8a9094', font=('Segoe UI', 9, 'bold'), anchor='w', bd=0, highlightthickness=0)
         self.tree_label.pack(fill='x', pady=(10, 5), padx=10)
         
         self.path_frame = Frame(self.right_frame, bg=self.bg_panel, bd=0, highlightthickness=0)
@@ -153,10 +171,12 @@ class GUI:
         self.populate_file_explorer(self.current_directory)
 
     def setup_statusbar(self):
-        self.status_bar = Label(self.root, text=" Listo", bg=self.bg_panel, fg=self.fg_ui, font=self.font_ui, anchor=W, pady=4, bd=0, highlightthickness=0, relief=FLAT)
+        """Initializes the bottom status bar for cursor position tracking."""
+        self.status_bar = Label(self.root, text=" Ready", bg=self.bg_panel, fg=self.fg_ui, font=self.font_ui, anchor=W, pady=4, bd=0, highlightthickness=0, relief=FLAT)
         self.status_bar.pack(side=BOTTOM, fill=X)
 
     def bind_events(self):
+        """Binds global keyboard shortcuts and mouse events."""
         self.tree.bind('<Double-1>', self.on_tree_double_click) 
         self.tree.bind('<<TreeviewOpen>>', self.on_tree_open) 
 
@@ -176,25 +196,31 @@ class GUI:
         self.root.bind('<Control-w>', self.close_current_tab)
         self.root.bind('<Control-Tab>', self.next_tab)
 
+        self.root.bind('<Control-l>', lambda e: Env.console.clear())
+
     def render(self):
+        """Renders the main window and starts the Tkinter event loop."""
         self.root.geometry(self.window_size)
         self.root.title(self.title)
         self.root.configure(bg=self.bg_panel)
 
         self.bottom_frame.grid_columnconfigure(0, weight=1)
         self.bottom_frame.grid_rowconfigure(1, weight=1)
-        self.label_salida.grid(row=0, column=0, sticky='nw', padx=10, pady=5)
+        self.output_label.grid(row=0, column=0, sticky='nw', padx=10, pady=5)
 
         self.root.config(menu=self.menu_bar)
         self.root.mainloop()
 
+    # --- Window and Tab Management ---
+
     def on_closing(self):
+        """Handles application shutdown, prompting to save unsaved files."""
         tabs_to_check = list(self.tabs.keys())
         for tab_id in tabs_to_check:
             data = self.tabs.get(tab_id)
             if data and data['is_modified']:
                 self.select_tab(tab_id)
-                resp = messagebox.askyesnocancel("Salir de la IDE", f"¿Desea guardar los cambios en '{data['name']}' antes de salir?")
+                resp = messagebox.askyesnocancel("Exit IDE", f"Do you want to save changes to '{data['name']}' before exiting?")
                 if resp: 
                     self.save_file()
                     if self.tabs[tab_id]['is_modified']: 
@@ -205,7 +231,8 @@ class GUI:
         self.root.destroy()
 
     def add_tab(self, file_path=None, content=""):
-        name = os.path.basename(file_path) if file_path else "Sin título"
+        """Creates a new editor tab with synchronized line numbers."""
+        name = os.path.basename(file_path) if file_path else "Untitled"
         tab_frame = Frame(self.notebook, bg=self.bg_editor, bd=0, highlightthickness=0)
         tab_id = str(tab_frame)
         
@@ -320,6 +347,7 @@ class GUI:
         return "break"
 
     def on_tab_drag(self, event, drag_tab_id):
+        """Allows reordering of tabs via drag-and-drop."""
         x_root = event.widget.winfo_rootx() + event.x
         for tab_id, data in self.tabs.items():
             if tab_id != drag_tab_id:
@@ -353,7 +381,7 @@ class GUI:
         data = self.tabs[tab_id]
         if data['is_modified']:
             self.select_tab(tab_id) 
-            resp = messagebox.askyesnocancel("Guardar cambios", f"¿Desea guardar los cambios en '{data['name']}' antes de cerrar?")
+            resp = messagebox.askyesnocancel("Save changes", f"Do you want to save changes to '{data['name']}' before closing?")
             if resp: 
                 self.save_file()
                 if self.tabs[tab_id]['is_modified']: 
@@ -380,6 +408,8 @@ class GUI:
             return self.tabs.get(current_tab_id)
         return None
 
+    # --- Editor Events ---
+
     def on_key_release(self, event=None):
         self.update_line_numbers()
         self.update_status_bar()
@@ -397,16 +427,16 @@ class GUI:
     def update_status_bar(self, event=None):
         data = self.get_current_tab_data()
         if not data:
-            self.status_bar.config(text=" Listo")
+            self.status_bar.config(text=" Ready")
             self.root.title(self.title)
             return
 
         cursor_pos = data['text'].index(INSERT)
         line, col = cursor_pos.split('.')
-        self.status_bar.config(text=f"  Línea: {line}  |  Columna: {col}  |  Archivo: {data['name']}")
+        self.status_bar.config(text=f"  Line: {line}  |  Column: {col}  |  File: {data['name']}")
         
-        estado_mod = " (Modificado)" if data['is_modified'] else ""
-        self.root.title(f"{self.title} - {data['name']}{estado_mod}")
+        status_mod = " (Modified)" if data['is_modified'] else ""
+        self.root.title(f"{self.title} - {data['name']}{status_mod}")
 
     def update_line_numbers(self, event=None):
         data = self.get_current_tab_data()
@@ -415,14 +445,16 @@ class GUI:
         code_text = data['text']
         line_numbers = data['lines']
 
-        lineas_totales = int(code_text.index('end-1c').split('.')[0])
-        numeros_str = "\n".join(str(i) for i in range(1, lineas_totales + 1))
+        total_lines = int(code_text.index('end-1c').split('.')[0])
+        numbers_str = "\n".join(str(i) for i in range(1, total_lines + 1))
         
         line_numbers.config(state='normal')
         line_numbers.delete('1.0', END)
-        line_numbers.insert('1.0', numeros_str)
+        line_numbers.insert('1.0', numbers_str)
         line_numbers.config(state='disabled')
         line_numbers.yview_moveto(code_text.yview()[0])
+
+    # --- File Explorer Methods ---
 
     def on_path_entry_changed(self, event=None):
         new_path = self.path_var.get()
@@ -430,10 +462,11 @@ class GUI:
             self.current_directory = new_path
             self.populate_file_explorer(self.current_directory)
         else:
-            messagebox.showerror("Error", "La ruta especificada no existe o no es un directorio válido.")
+            messagebox.showerror("Error", "The specified path does not exist or is not a valid directory.")
             self.path_var.set(self.current_directory)
 
     def populate_file_explorer(self, path):
+        """Populates the treeview with directories and compatible files."""
         self.tree.delete(*self.tree.get_children()) 
         self._populate_node('', path) 
 
@@ -456,6 +489,7 @@ class GUI:
             pass
 
     def on_tree_open(self, event):
+        """Lazy-loads subdirectories when expanded in the treeview."""
         node = self.tree.focus()
         children = self.tree.get_children(node)
         
@@ -465,16 +499,16 @@ class GUI:
             self._populate_node(node, folder_path)
 
     def refresh_explorer(self):
-        """Recarga el árbol de archivos basándose en el directorio actual."""
+        """Reloads the file tree based on the current directory."""
         if os.path.isdir(self.current_directory):
             self.populate_file_explorer(self.current_directory)
             if Env.console:
-                Env.console.print_notification("Explorador de archivos actualizado.")
+                Env.console.print_notification("File explorer updated.")
         else:
-            messagebox.showerror("Error", "El directorio actual ya no existe.")
+            messagebox.showerror("Error", "The current directory no longer exists.")
 
     def open_folder(self):
-        folder_selected = filedialog.askdirectory(title="Seleccionar Carpeta", initialdir=self.current_directory)
+        folder_selected = filedialog.askdirectory(title="Select Folder", initialdir=self.current_directory)
         if folder_selected:
             self.current_directory = folder_selected
             self.path_var.set(self.current_directory)
@@ -490,39 +524,41 @@ class GUI:
             if os.path.isfile(file_path):
                 self._load_file_content(file_path)
 
-    def _load_file_content(self, ruta_archivo):
+    def _load_file_content(self, file_path):
         for tab_id, data in self.tabs.items():
-            if data['path'] == ruta_archivo:
+            if data['path'] == file_path:
                 self.select_tab(tab_id)
                 return
 
         try:
-            with open(ruta_archivo, 'r', encoding='utf-8') as archivo:
-                contenido = archivo.read()
-            self.add_tab(ruta_archivo, contenido)
+            with open(file_path, 'r', encoding='utf-8') as file:
+                content = file.read()
+            self.add_tab(file_path, content)
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo leer el archivo:\n{e}")
+            messagebox.showerror("Error", f"Could not read the file:\n{e}")
+
+    # --- File Operations ---
 
     def new_file(self, event=None):
         self.add_tab(None, "")
 
     def open_file(self, event=None):
-        ruta_archivo = filedialog.askopenfilename(
-            title="Abrir archivo",
+        file_path = filedialog.askopenfilename(
+            title="Open File",
             defaultextension=".php",
-            filetypes=[("Archivos PHP", "*.php"), ("Ensamblador", "*.asm"), ("Todos los archivos", "*.*")]
+            filetypes=[("PHP Files", "*.php"), ("Assembly", "*.asm"), ("All files", "*.*")]
         )
-        if ruta_archivo:
-            self._load_file_content(ruta_archivo)
+        if file_path:
+            self._load_file_content(file_path)
 
     def save_file_as(self, event=None):
         data = self.get_current_tab_data()
         if not data: return
 
         path = filedialog.asksaveasfilename(
-            title="Guardar archivo como",
+            title="Save File As",
             defaultextension=".php",
-            filetypes=[("Archivos PHP", "*.php"), ("Todos los archivos", "*.*")]
+            filetypes=[("PHP Files", "*.php"), ("All files", "*.*")]
         )
         if path:
             try:
@@ -542,7 +578,7 @@ class GUI:
                     self.populate_file_explorer(self.current_directory)
                     self.refresh_explorer()
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo guardar el archivo:\n{e}")
+                messagebox.showerror("Error", f"Could not save the file:\n{e}")
 
     def save_file(self, event=None):
         data = self.get_current_tab_data()
@@ -561,140 +597,145 @@ class GUI:
                 self.update_status_bar()
                 self.refresh_explorer()
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo guardar el archivo:\n{e}")
+                messagebox.showerror("Error", f"Could not save the file:\n{e}")
         else:
             self.save_file_as()
 
+    # --- Compiler Pipeline Methods ---
+
     def parse(self, event=None):
+        """Phase 1: Lexical and Syntax Analysis -> Generates AST."""
         tab_data = self.get_current_tab_data()
         
         if not tab_data:
-            Env.console.print_alert("Error: No hay ningún archivo abierto para compilar.")
+            Env.console.print_alert("Error: No file open to compile.")
             return
 
         code = tab_data['text'].get("1.0", "end-1c")
 
         if not code.strip():
-            Env.console.print("Advertencia: El archivo está vacío.")
+            Env.console.print("Warning: The file is empty.")
             return
 
-        Env.console.print_notification(f"- - - - - - INICIANDO PARSEO: {tab_data['name']}")
-        traza = 1
+        Env.console.print_notification(f"- - - - - - STARTING PARSE: {tab_data['name']}")
+        
+        # Reset global state before compiling new code
+        self.ast = None
+        self.is_semantic_approved = False
+        self.output_asm_path = None
+        
+        trace = 1
         
         try:
-            self.lexer = Lexer(code, traza)
+            self.lexer = Lexer(code, trace)
             self.parser = Parser(self.lexer) 
-            self.arbol = self.parser.parse()
+            self.ast = self.parser.parse()
             
-            if self.arbol:
-                Env.console.print("--- Árbol de Sintaxis Abstracta (AST) ---")
-                self.arbol.print_tree()
-                Env.console.print_notification("- - - - - - PARSEO COMPLETADO CON ÉXITO")
-                self.semantica_aprobada = False # Resetear bandera por si hubo cambios
+            if self.ast:
+                Env.console.print("--- Abstract Syntax Tree (AST) ---")
+                self.ast.print_tree()
+                Env.console.print_notification("- - - - - - PARSING COMPLETED SUCCESSFULLY")
             else:
-                Env.console.print_alert("Error: El parser no pudo generar el árbol.")
+                Env.console.print_alert("Error: The parser could not generate the tree.")
                 
         except SystemExit as e:
-            Env.console.print_alert(f"Proceso detenido por error sintáctico (Código de salida: {e.code})")
+            Env.console.print_alert(f"Process stopped due to a syntax error (Exit code: {e.code})")
             
         except Exception as e:
-            Env.console.print_alert(f"Excepción inesperada durante el parseo: {str(e)}")
+            Env.console.print_alert(f"Unexpected exception during parsing: {str(e)}")
             
     def semantic(self, event=None):
-        if not hasattr(self, 'arbol') or self.arbol is None:
-            Env.console.print_alert("Error: No hay un Árbol de Sintaxis (AST) en memoria. Ejecuta el Parser primero.")
+        """Phase 2: Semantic Analysis -> Validates types, scopes, and context."""
+        if not getattr(self, 'ast', None):
+            Env.console.print_alert("Error: No Abstract Syntax Tree (AST) in memory. Run the Parser first.")
             return
 
-        Env.console.print_notification(f"- - - - - - INICIANDO ANÁLISIS SEMÁNTICO")
+        Env.console.print_notification(f"- - - - - - STARTING SEMANTIC ANALYSIS")
+        
+        self.is_semantic_approved = False
         
         try:
-            analizador_semantico = SemanticAnalyzer(self.arbol)
-            exito_semantico = analizador_semantico.analizar()
+            semantic_analyzer = Semantic_Analyzer(self.ast)
+            semantic_success = semantic_analyzer.analyze()
             
-            if exito_semantico:
-                Env.console.print_notification("- - - - - - ANÁLISIS SEMÁNTICO PASÓ TODAS LAS PRUEBAS")
-                self.semantica_aprobada = True 
+            if semantic_success:
+                Env.console.print_notification("- - - - - - SEMANTIC ANALYSIS PASSED ALL TESTS")
+                self.is_semantic_approved = True 
             else:
-                Env.console.print_alert("- - - - - - ANÁLISIS SEMÁNTICO FINALIZÓ CON ERRORES")
-                self.semantica_aprobada = False
+                Env.console.print_alert("- - - - - - SEMANTIC ANALYSIS FINISHED WITH ERRORS")
                 
         except Exception as e:
-            Env.console.print_alert(f"Excepción inesperada durante el análisis semántico: {str(e)}")
+            Env.console.print_alert(f"Unexpected exception during semantic analysis: {str(e)}")
 
     def generate_code(self, event=None):
-        if not getattr(self, 'semantica_aprobada', False):
-            Env.console.print_alert("Error: Debes ejecutar y aprobar el Análisis Semántico primero.")
+        """Phase 3: Intermediate Code Generation -> Emits Assembly/VM Code."""
+        if not getattr(self, 'is_semantic_approved', False):
+            Env.console.print_alert("Error: You must run and approve the Semantic Analysis first.")
             return
             
-        Env.console.print_notification(f"- - - - - - INICIANDO GENERACIÓN DE CÓDIGO INTERMEDIO")
+        Env.console.print_notification(f"- - - - - - STARTING INTERMEDIATE CODE GENERATION")
         try:
-            # Archivo de salida, por defecto en el directorio del proyecto actual
-            output_file = os.path.join(self.current_directory, "output.asm")
+            output_file = os.path.join(self.current_directory, "Output/" + self.get_current_tab_data()['name'] + "_output.asm")
             
-            generador = Code_Generator(self.arbol, output_file, Env.console)
-            generador.generar_codigo()
+            generator = Code_Generator(self.ast, output_file, Env.console)
+            generator.generate_code()
             
             self.output_asm_path = output_file
-            self.refresh_explorer() # Refrescamos para que el usuario vea el output.asm en la barra lateral
+            self.refresh_explorer()
             
         except Exception as e:
-            Env.console.print_alert(f"Error en la generación de código: {str(e)}")
+            Env.console.print_alert(f"Error in code generation: {str(e)}")
 
     def run_vm(self, event=None):
-        # Asegurarnos de que el archivo existe
-        if not hasattr(self, 'output_asm_path') or not os.path.exists(self.output_asm_path):
-            Env.console.print_alert("Error: No se encontró el código intermedio (.asm). Genera el código primero.")
+        """Phase 4: Virtual Machine Execution -> Runs the generated .asm file."""
+        if not getattr(self, 'output_asm_path', None) or not os.path.exists(self.output_asm_path):
+            Env.console.print_alert("Error: Intermediate code (.asm) not found. Generate the code first.")
             return
 
-        Env.console.print_notification(f"- - - - - - EJECUTANDO MÁQUINA VIRTUAL")
+        Env.console.print_notification(f"- - - - - - EXECUTING VIRTUAL MACHINE")
         
-        # Redirigimos sys.stdout temporalmente para capturar los prints de la VM
+        # Redirect sys.stdout temporarily to capture VM prints
         old_stdout = sys.stdout
         sys.stdout = io.StringIO()
         
         try:
             vm = Virtual_Machine(self.output_asm_path)
-            vm.ejecutar()
+            vm.execute()
             
-            # Obtener lo que la VM imprimió y restaurar la salida estándar
-            salida_vm = sys.stdout.getvalue()
+            vm_output = sys.stdout.getvalue()
             sys.stdout = old_stdout
             
-            # Imprimir en la consola de la interfaz gráfica
-            for linea in salida_vm.split('\n'):
-                if linea.strip():
-                    Env.console.print(linea)
+            for line in vm_output.split('\n'):
+                if line.strip():
+                    Env.console.print(line)
                     
         except Exception as e:
-            # En caso de error crítico, restauramos el stdout y lo imprimimos
             sys.stdout = old_stdout
-            Env.console.print_alert(f"Error durante la ejecución de la Máquina Virtual: {str(e)}")
+            Env.console.print_alert(f"Error during Virtual Machine execution: {str(e)}")
 
     def run_all(self, event=None):
-        Env.console.print_notification("=== EJECUCIÓN COMPLETA INICIADA ===")
+        """Executes the entire compiler pipeline automatically."""
+        Env.console.clear()
+        Env.console.print_notification("=== FULL EXECUTION STARTED ===")
         
-        # 1. Intentar Parseo
+        # 1. Parse
         self.parse()
-        if not hasattr(self, 'arbol') or self.arbol is None:
-            Env.console.print_alert("Abortado: Error en el Parser.")
+        if getattr(self, 'ast', None) is None:
+            Env.console.print_alert("Aborted: Parser Error.")
             return
 
-        # 2. Intentar Análisis Semántico
+        # 2. Semantic Analysis
         self.semantic()
-        if not getattr(self, 'semantica_aprobada', False):
-            Env.console.print_alert("Abortado: Error Semántico.")
+        if not getattr(self, 'is_semantic_approved', False):
+            Env.console.print_alert("Aborted: Semantic Error.")
             return
 
-        # 3. Generar Código
+        # 3. Code Generation
         self.generate_code()
-        if not hasattr(self, 'output_asm_path') or not os.path.exists(self.output_asm_path):
-            Env.console.print_alert("Abortado: No se pudo generar el código .asm.")
+        if not getattr(self, 'output_asm_path', None) or not os.path.exists(self.output_asm_path):
+            Env.console.print_alert("Aborted: Could not generate the .asm code.")
             return
 
-        # 4. Ejecutar en VM
+        # 4. Execute VM
         self.run_vm()
-        Env.console.print_notification("=== EJECUCIÓN FINALIZADA ===")
-
-if __name__ == '__main__':
-    gui = GUI()
-    gui.render()
+        Env.console.print_notification("=== EXECUTION FINISHED ===")
